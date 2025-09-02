@@ -37,6 +37,11 @@ end
 
 post_install do |installer|
   installer.pods_project.targets.each do |target|
+    # Ensure every pod uses a modern macOS target (fixes 10.11 warnings)
+    target.build_configurations.each do |config|
+      config.build_settings['MACOSX_DEPLOYMENT_TARGET'] = '10.15'
+    end
+    
     flutter_additional_macos_build_settings(target)
   end
 end
