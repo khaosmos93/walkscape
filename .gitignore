@@ -47,3 +47,5 @@ app.*.map.json
 # tmp files/directories
 
 **/*tmp*
+
+.env

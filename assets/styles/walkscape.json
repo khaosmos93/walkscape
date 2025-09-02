@@ -1,0 +1,109 @@
+{
+  "version": 8,
+  "name": "Walkscape B/W Relief",
+  "glyphs": "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+  "sources": {
+    "terrainRGB": {
+      "type": "raster-dem",
+      "tiles": [
+        "https://api.maptiler.com/tiles/terrain-rgb/{z}/{x}/{y}.png?key={MAPTILER_KEY}"
+      ],
+      "tileSize": 512,
+      "encoding": "mapbox",
+      "minzoom": 0,
+      "maxzoom": 14
+    },
+    "openmaptiles": {
+      "type": "vector",
+      "tiles": [
+        "https://api.maptiler.com/tiles/v3/{z}/{x}/{y}.pbf?key={MAPTILER_KEY}"
+      ],
+      "minzoom": 0,
+      "maxzoom": 14
+    }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": { "background-color": "#000000" }
+    },
+    {
+      "id": "hillshade",
+      "type": "hillshade",
+      "source": "terrainRGB",
+      "paint": {
+        "hillshade-exaggeration": 0.9,
+        "hillshade-shadow-color": "#000000",
+        "hillshade-highlight-color": "#ffffff",
+        "hillshade-accent-color": "#9a9a9a"
+      }
+    },
+    {
+      "id": "water",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "water",
+      "paint": { "fill-color": "#0A3D91" }
+    },
+    {
+      "id": "waterway",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "waterway",
+      "filter": ["match", ["get", "class"], ["river", "canal", "stream"], true, false],
+      "paint": {
+        "line-color": "#0A3D91",
+        "line-width": [
+          "interpolate", ["linear"], ["zoom"],
+          8, 0.3, 12, 1.2, 14, 2.4, 16, 4.0
+        ]
+      }
+    },
+    {
+      "id": "road-major-case",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "filter": ["match", ["get", "class"], ["motorway", "trunk", "primary", "secondary"], true, false],
+      "paint": {
+        "line-color": "#202020",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 7, 0.8, 10, 2.0, 12, 3.0, 14, 5.0, 16, 8.0]
+      }
+    },
+    {
+      "id": "road-major",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "filter": ["match", ["get", "class"], ["motorway", "trunk", "primary", "secondary"], true, false],
+      "paint": {
+        "line-color": "#E0E0E0",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 7, 0.6, 10, 1.4, 12, 2.2, 14, 4.0, 16, 6.5]
+      }
+    },
+    {
+      "id": "road-minor",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "filter": ["match", ["get", "class"], ["tertiary", "minor", "service"], true, false],
+      "paint": {
+        "line-color": "#C6C6C6",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.3, 12, 0.8, 14, 1.6, 16, 3.0]
+      }
+    },
+    {
+      "id": "trails",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "filter": ["match", ["get", "class"], ["path", "track", "footway", "cycleway"], true, false],
+      "paint": {
+        "line-color": "#A8A8A8",
+        "line-dasharray": [1.0, 1.0],
+        "line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 14, 1.0, 16, 2.0]
+      }
+    }
+  ]
+}

@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'features/map/presentation/map_screen.dart';
 
-void main() => runApp(const WalkscapeApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env"); // requires MAPTILER_KEY (and optional MAPTILER_STYLE_URL)
+  runApp(const WalkscapeApp());
+}
 
 class WalkscapeApp extends StatelessWidget {
   const WalkscapeApp({super.key});
@@ -10,18 +16,7 @@ class WalkscapeApp extends StatelessWidget {
     return MaterialApp(
       title: 'WalkscapE',
       theme: ThemeData(brightness: Brightness.dark, useMaterial3: true),
-      home: const _Home(),
-    );
-  }
-}
-
-class _Home extends StatelessWidget {
-  const _Home({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: Text('WalkscapE booted ✔')),
+      home: const MapScreen(),
     );
   }
 }
