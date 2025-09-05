@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:geolocator/geolocator.dart';
 import 'package:maplibre_gl/maplibre_gl.dart' as mgl;
@@ -22,10 +24,30 @@ class _MapScreenState extends State<MapScreen> {
   ll.LatLng? _me;
   Stream<Position>? _posStream;
 
+  String? _styleString; // <-- final style after injecting the key
+
   @override
   void initState() {
     super.initState();
+    _loadStyleFromAssetAndInjectKey();
     _initLocation();
+  }
+
+  Future<void> _loadStyleFromAssetAndInjectKey() async {
+    // 1) Read the asset JSON that contains {MAPTILER_KEY}
+    final raw = await rootBundle.loadString('assets/styles/walkscape.json');
+
+    // 2) Get the key from .env (make sure you load dotenv in main.dart)
+    final key = dotenv.env['MAPTILER_KEY'] ?? '';
+    if (key.isEmpty) {
+      debugPrint('MAPTILER_KEY is empty. Did you call dotenv.load(fileName: ".env") in main()?');
+    }
+
+    // 3) Replace placeholder -> actual key
+    final injected = raw.replaceAll('{MAPTILER_KEY}', key);
+
+    if (!mounted) return;
+    setState(() => _styleString = injected);
   }
 
   Future<void> _initLocation() async {
@@ -83,6 +105,7 @@ class _MapScreenState extends State<MapScreen> {
   mgl.LatLng _toMgl(ll.LatLng p) => mgl.LatLng(p.latitude, p.longitude);
 
   String _hexRGB(Color c) {
+    // If your SDK doesn’t expose .r/.g/.b, switch to c.red/c.green/c.blue
     final r = (c.r * 255.0).round() & 0xff;
     final g = (c.g * 255.0).round() & 0xff;
     final b = (c.b * 255.0).round() & 0xff;
@@ -108,25 +131,28 @@ class _MapScreenState extends State<MapScreen> {
       appBar: AppBar(title: const Text('WalkscapE')),
       body: Stack(
         children: [
-          mgl.MapLibreMap(
-            // Load the asset style to avoid inline-JSON fallback:
-            styleString: "asset://assets/styles/walkscape.json",
-            initialCameraPosition: mgl.CameraPosition(
-              target: _toMgl(center),
-              zoom: 12,
+          // Wait until the style with injected key is ready
+          if (_styleString == null)
+            const Center(child: CircularProgressIndicator())
+          else
+            mgl.MapLibreMap(
+              styleString: _styleString!, // <-- final style with key inlined
+              initialCameraPosition: mgl.CameraPosition(
+                target: _toMgl(center),
+                zoom: 12,
+              ),
+              myLocationEnabled: true,
+              compassEnabled: false,
+              onMapCreated: (controller) async {
+                _mgl = controller;
+                if (_me != null) {
+                  await controller.animateCamera(mgl.CameraUpdate.newLatLng(_toMgl(_me!)));
+                }
+              },
+              onStyleLoadedCallback: () async {
+                await _updateTrackLine();
+              },
             ),
-            myLocationEnabled: true,
-            compassEnabled: false,
-            onMapCreated: (controller) async {
-              _mgl = controller;
-              if (_me != null) {
-                await controller.animateCamera(mgl.CameraUpdate.newLatLng(_toMgl(_me!)));
-              }
-            },
-            onStyleLoadedCallback: () async {
-              await _updateTrackLine();
-            },
-          ),
 
           // Stats pill
           Positioned(
@@ -187,20 +213,20 @@ class _MapScreenState extends State<MapScreen> {
                   },
                 ),
           const SizedBox(height: 10),
+
+          // Export GPX with the new SharePlus API (ShareParams)
           _Fab(
             icon: Icons.ios_share,
             tooltip: 'Export GPX',
             onPressed: _recorder.points.length < 2
                 ? null
                 : () async {
-                    // Capture anchor BEFORE any await to satisfy the async-gap lint.
+                    // Anchor BEFORE awaits (async-gap lint)
                     final box = context.findRenderObject() as RenderBox?;
-                    final origin =
-                        box != null ? (box.localToGlobal(Offset.zero) & box.size) : null;
+                    final origin = box != null ? (box.localToGlobal(Offset.zero) & box.size) : null;
 
                     final file = await exportGpx(_recorder.points);
-                    final fileName =
-                        'walkscape_${DateTime.now().toIso8601String().replaceAll(':', '-')}.gpx';
+                    final fileName = 'walkscape_${DateTime.now().toIso8601String().replaceAll(':', '-')}.gpx';
 
                     await SharePlus.instance.share(
                       ShareParams(
@@ -214,7 +240,6 @@ class _MapScreenState extends State<MapScreen> {
                     );
                   },
           ),
-
           const SizedBox(height: 10),
           _Fab(
             icon: Icons.delete_outline,
@@ -287,6 +312,7 @@ class _StatsPillState extends State<_StatsPill> {
   }
 
   void _onTick(Duration d) {
+    if (!mounted) return;
     if (!widget.isRecording || widget.startedAt == null) return;
     setState(() => _elapsed = DateTime.now().difference(widget.startedAt!));
   }
