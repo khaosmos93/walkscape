@@ -34,6 +34,10 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _loadStyleFromAssetAndInjectKey() async {
+    if (!dotenv.isInitialized) {
+      try { await dotenv.load(fileName: '.env'); } catch (_) {}
+    }
+
     // 1) Read the asset JSON that contains {MAPTILER_KEY}
     final raw = await rootBundle.loadString('assets/styles/walkscape.json');
 

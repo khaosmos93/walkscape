@@ -4,7 +4,7 @@ import 'features/map/presentation/map_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: ".env"); // requires MAPTILER_KEY (and optional MAPTILER_STYLE_URL)
+  await dotenv.load(fileName: ".env");
   runApp(const WalkscapeApp());
 }
 
