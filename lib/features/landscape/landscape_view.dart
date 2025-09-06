@@ -6,12 +6,12 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:flutter/foundation.dart' show consolidateHttpClientResponseBytes;
+import 'package:flutter/foundation.dart'
+    show consolidateHttpClientResponseBytes;
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'package:three_js_core/three_js_core.dart' as three;
-import 'package:three_js_core/buffer/buffer_attribute.dart' as tbuf;
 import 'package:three_js_math/three_js_math.dart' as tmath;
 import 'package:three_js_geometry/three_js_geometry.dart' as tgeo;
 import 'package:three_js_controls/three_js_controls.dart' as controls;
@@ -52,10 +52,7 @@ class _LandscapeViewState extends State<LandscapeView> {
   @override
   void initState() {
     super.initState();
-    _three = three.ThreeJS(
-      setup: _setupScene,
-      onSetupComplete: () {},
-    );
+    _three = three.ThreeJS(setup: _setupScene, onSetupComplete: () {});
     WidgetsBinding.instance.addPostFrameCallback((_) {
       setState(() => _ready = true);
     });
@@ -63,7 +60,7 @@ class _LandscapeViewState extends State<LandscapeView> {
 
   Future<void> _setupScene() async {
     _scene = _three.scene = three.Scene()
-      ..background = tmath.Color.fromHex32(widget.bgColor.value);
+      ..background = tmath.Color.fromHex32(widget.bgColor.toARGB32());
 
     final w = (_three.width > 0 ? _three.width : 1280).toDouble();
     final h = (_three.height > 0 ? _three.height : 720).toDouble();
@@ -97,20 +94,30 @@ class _LandscapeViewState extends State<LandscapeView> {
 
   // --------------------- Terrain helpers ---------------------
 
+  double _sinh(double x) => (math.exp(x) - math.exp(-x)) / 2;
+
   (int x, int y) _latLonToTileXY(double lat, double lon, int z) {
     final n = 1 << z;
     final x = ((lon + 180.0) / 360.0 * n).floor();
     final latRad = lat * math.pi / 180.0;
-    final y = ((1.0 - math.log(math.tan(latRad) + 1 / math.cos(latRad)) / math.pi) / 2.0 * n).floor();
+    final y =
+        ((1.0 - math.log(math.tan(latRad) + 1 / math.cos(latRad)) / math.pi) /
+                2.0 *
+                n)
+            .floor();
     return (x, y);
   }
 
-  ({double latMin, double latMax, double lonMin, double lonMax}) _tileBounds(int x, int y, int z) {
+  ({double latMin, double latMax, double lonMin, double lonMax}) _tileBounds(
+    int x,
+    int y,
+    int z,
+  ) {
     final n = 1 << z;
     final lonMin = x / n * 360.0 - 180.0;
     final lonMax = (x + 1) / n * 360.0 - 180.0;
 
-    double mercToLat(double a) => (math.atan(math.sinh(a)) * 180.0 / math.pi);
+    double mercToLat(double a) => (math.atan(_sinh(a)) * 180.0 / math.pi);
     final latMax = mercToLat(math.pi * (1 - 2 * y / n));
     final latMin = mercToLat(math.pi * (1 - 2 * (y + 1) / n));
     return (latMin: latMin, latMax: latMax, lonMin: lonMin, lonMax: lonMax);
@@ -119,9 +126,13 @@ class _LandscapeViewState extends State<LandscapeView> {
   Future<Uint8List> _fetchTerrainRgbPng(int x, int y, int z) async {
     final key = dotenv.env['MAPTILER_KEY'] ?? '';
     if (key.isEmpty) {
-      throw StateError('MAPTILER_KEY missing. Ensure dotenv.load() ran in main().');
+      throw StateError(
+        'MAPTILER_KEY missing. Ensure dotenv.load() ran in main().',
+      );
     }
-    final url = Uri.parse('https://api.maptiler.com/tiles/terrain-rgb/$z/$x/$y.png?key=$key');
+    final url = Uri.parse(
+      'https://api.maptiler.com/tiles/terrain-rgb/$z/$x/$y.png?key=$key',
+    );
     final client = HttpClient();
     try {
       final req = await client.getUrl(url);
@@ -141,12 +152,16 @@ class _LandscapeViewState extends State<LandscapeView> {
     return frame.image;
   }
 
-  List<double> _decodeHeights(ui.Image image) {
-    final bd = image.toByteData(format: ui.ImageByteFormat.rawRgba);
+  Future<List<double>> _decodeHeights(ui.Image image) async {
+    final bd = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
     if (bd == null) throw Exception('Failed to read RGBA bytes');
     final u8 = bd.buffer.asUint8List();
 
-    final out = List<double>.filled(image.width * image.height, 0.0, growable: false);
+    final out = List<double>.filled(
+      image.width * image.height,
+      0.0,
+      growable: false,
+    );
     for (int i = 0, p = 0; i < out.length; i++, p += 4) {
       final r = u8[p], g = u8[p + 1], b = u8[p + 2];
       out[i] = -10000.0 + (r * 256 * 256 + g * 256 + b) * 0.1;
@@ -168,7 +183,7 @@ class _LandscapeViewState extends State<LandscapeView> {
     final bytes = await _fetchTerrainRgbPng(tx, ty, zoom);
     final img = await _decodePng(bytes);
     final side = img.width;
-    final heights = _decodeHeights(img);
+    final heights = await _decodeHeights(img);
 
     const R = 6_371_000.0;
 
@@ -233,14 +248,14 @@ class _LandscapeViewState extends State<LandscapeView> {
     final geom = three.BufferGeometry()
       ..setAttributeFromString(
         'position',
-        tbuf.Float32BufferAttribute.fromList(positions, 3),
+        tmath.Float32BufferAttribute.fromList(positions, 3),
       );
     geom.setIndex(indices);
     geom.computeVertexNormals();
 
     final wireGeo = tgeo.WireframeGeometry(geom);
     final lineMat = three.LineBasicMaterial.fromMap({
-      'color': wireColor.value,
+      'color': wireColor.toARGB32(),
       'transparent': true,
       'opacity': 0.9,
     });
@@ -272,12 +287,15 @@ class _LandscapeViewState extends State<LandscapeView> {
           top: MediaQuery.of(context).padding.top + 12,
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: const Color(0xFF000000).withOpacity(0.45),
+              color: const Color(0xFF000000).withValues(alpha: 0.45),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Padding(
               padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              child: Text('Drag: orbit • Pinch/scroll: zoom', style: TextStyle(fontSize: 12)),
+              child: Text(
+                'Drag: orbit • Pinch/scroll: zoom',
+                style: TextStyle(fontSize: 12),
+              ),
             ),
           ),
         ),
